@@ -25,7 +25,7 @@ parser.add_argument('--lr', metavar='LR', default=0.1, type=float,
                     help='learning rate')
 parser.add_argument('--nConv', metavar='M', default=2, type=int, 
                     help='number of convolutional layers')
-parser.add_argument('--num_superpixels', metavar='K', default=3000, type=int, 
+parser.add_argument('--num_superpixels', metavar='K', default=10000, type=int, 
                     help='number of superpixels')
 parser.add_argument('--compactness', metavar='C', default=100, type=float, 
                     help='compactness of superpixels')
@@ -40,14 +40,10 @@ class MyNet(nn.Module):
     def __init__(self,input_dim):
         super(MyNet, self).__init__()
         self.conv1 = nn.Conv2d(input_dim, args.nChannel, kernel_size=3, stride=1, padding=1 )
-        self.conv1.weight = nn.init.normal(self.conv1.weight)
-        self.conv1.bias.data.zero_()
-        self.conv2 = nn.Conv2d(args.nChannel, args.nChannel, kernel_size=3, stride=1, padding=1 )
-        self.conv2.weight = nn.init.normal(self.conv2.weight)
-        self.conv2.bias.data.zero_()
+        self.conv2 = []
+        for i in range(args.nConv-1):
+            self.conv2.append( nn.Conv2d(args.nChannel, args.nChannel, kernel_size=3, stride=1, padding=1 ) )
         self.conv3 = nn.Conv2d(args.nChannel, args.nChannel, kernel_size=1, stride=1, padding=0 )
-        self.conv3.weight = nn.init.normal(self.conv3.weight)
-        self.conv3.bias.data.zero_()
         self.bn0 = nn.BatchNorm2d(args.nChannel)
         self.bn1 = nn.BatchNorm2d(args.nChannel)
 
@@ -56,7 +52,7 @@ class MyNet(nn.Module):
         x = F.relu( x )
         x = self.bn0(x)
         for i in range(args.nConv-1):
-            x = self.conv2(x)
+            x = self.conv2[i](x)
             x = F.relu( x )
             x = self.bn0(x)
         x = self.conv3(x)
@@ -82,6 +78,8 @@ for i in range(len(u_labels)):
 model = MyNet( data.size(1) )
 if use_cuda:
     model.cuda()
+    for i in range(args.nConv-1):
+        model.conv2[i].cuda()
 model.train()
 loss_fn = torch.nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9)
