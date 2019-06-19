@@ -41,8 +41,8 @@ class MyNet(nn.Module):
         super(MyNet, self).__init__()
         self.conv1 = nn.Conv2d(input_dim, args.nChannel, kernel_size=3, stride=1, padding=1 )
         self.bn1 = nn.BatchNorm2d(args.nChannel)
-        self.conv2 = []
-        self.bn2 = []
+        self.conv2 = nn.ModuleList()
+        self.bn2 = nn.ModuleList()
         for i in range(args.nConv-1):
             self.conv2.append( nn.Conv2d(args.nChannel, args.nChannel, kernel_size=3, stride=1, padding=1 ) )
             self.bn2.append( nn.BatchNorm2d(args.nChannel) )
@@ -80,9 +80,6 @@ for i in range(len(u_labels)):
 model = MyNet( data.size(1) )
 if use_cuda:
     model.cuda()
-    for i in range(args.nConv-1):
-        model.conv2[i].cuda()
-        model.bn2[i].cuda()
 model.train()
 loss_fn = torch.nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9)
@@ -119,6 +116,8 @@ for batch_idx in range(args.maxIter):
     optimizer.step()
 
     print (batch_idx, '/', args.maxIter, ':', nLabels, loss.data[0])
+    # for pytorch 1.0
+    # print (batch_idx, '/', args.maxIter, ':', nLabels, loss.item())
     if nLabels <= args.minLabels:
         print ("nLabels", nLabels, "reached minLabels", args.minLabels, ".")
         break
