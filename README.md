@@ -11,7 +11,7 @@ Asako Kanezaki.
 
 ## Requirements
 
-python3, pytorch, opencv2 
+python3, pytorch, opencv2, scikit-image
 
 ## Getting started
 

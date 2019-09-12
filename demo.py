@@ -115,9 +115,9 @@ for batch_idx in range(args.maxIter):
     loss.backward()
     optimizer.step()
 
-    print (batch_idx, '/', args.maxIter, ':', nLabels, loss.data[0])
-    # for pytorch 1.0
-    # print (batch_idx, '/', args.maxIter, ':', nLabels, loss.item())
+    #print (batch_idx, '/', args.maxIter, ':', nLabels, loss.data[0])
+    print (batch_idx, '/', args.maxIter, ':', nLabels, loss.item())
+
     if nLabels <= args.minLabels:
         print ("nLabels", nLabels, "reached minLabels", args.minLabels, ".")
         break
