@@ -33,7 +33,13 @@ parser.add_argument('--visualize', metavar='1 or 0', default=1, type=int,
                     help='visualization flag')
 parser.add_argument('--input', metavar='FILENAME',
                     help='input image file name', required=True)
+parser.add_argument('--seed', metavar='s', default=100, type=int, 
+                    help='seed for pseudorandom generator')
 args = parser.parse_args()
+
+np.random.seed(args.seed)
+torch.manual_seed(args.seed)
+torch.cuda.manual_seed(args.seed)
 
 # CNN model
 class MyNet(nn.Module):
@@ -44,7 +50,9 @@ class MyNet(nn.Module):
         self.conv2 = nn.ModuleList()
         self.bn2 = nn.ModuleList()
         for i in range(args.nConv-1):
-            self.conv2.append( nn.Conv2d(args.nChannel, args.nChannel, kernel_size=3, stride=1, padding=1 ) )
+            self.conv2.append(
+                nn.Conv2d(args.nChannel, args.nChannel, kernel_size=3, stride=1, padding=1 ) 
+            )
             self.bn2.append( nn.BatchNorm2d(args.nChannel) )
         self.conv3 = nn.Conv2d(args.nChannel, args.nChannel, kernel_size=1, stride=1, padding=0 )
         self.bn3 = nn.BatchNorm2d(args.nChannel)
@@ -66,16 +74,43 @@ im = cv2.imread(args.input)
 data = torch.from_numpy( np.array([im.transpose( (2, 0, 1) ).astype('float32')/255.]) )
 if use_cuda:
     data = data.cuda()
-data = Variable(data)
+#data = Variable(data)
 
 # slic
 labels = segmentation.slic(im, compactness=args.compactness, n_segments=args.num_superpixels)
 labels = labels.reshape(im.shape[0]*im.shape[1])
 u_labels = np.unique(labels)
-l_inds = []
-for i in range(len(u_labels)):
-    l_inds.append( np.where( labels == u_labels[ i ] )[ 0 ] )
 
+
+class L_Ind_Gen():
+    
+    def __init__(self):
+        self.l = []
+        self.i = 0
+        self.n = len(self.l)
+        
+    def __iter__(self):
+        return(self)
+    
+    def __next__(self):
+        if self.i < self.n:
+            self.i += 1
+            r = torch.from_numpy(
+                self.l[self.i-1]
+            ).type(torch.LongTensor)
+            if use_cuda:
+                r = r.cuda()
+            return(r)
+        else:
+            raise(StopIteration())
+
+
+l_inds = L_Ind_Gen()
+for i in range(len(u_labels)):
+    l_inds.l.append( np.where( labels == u_labels[ i ] )[ 0 ] )
+    
+    
+    
 # train
 model = MyNet( data.size(1) )
 if use_cuda:
@@ -99,23 +134,17 @@ for batch_idx in range(args.maxIter):
         cv2.waitKey(10)
 
     # superpixel refinement
-    # TODO: use Torch Variable instead of numpy for faster calculation
-    for i in range(len(l_inds)):
-        labels_per_sp = im_target[ l_inds[ i ] ]
-        u_labels_per_sp = np.unique( labels_per_sp )
-        hist = np.zeros( len(u_labels_per_sp) )
-        for j in range(len(hist)):
-            hist[ j ] = len( np.where( labels_per_sp == u_labels_per_sp[ j ] )[ 0 ] )
-        im_target[ l_inds[ i ] ] = u_labels_per_sp[ np.argmax( hist ) ]
-    target = torch.from_numpy( im_target )
-    if use_cuda:
-        target = target.cuda()
-    target = Variable( target )
+    #for i in l_inds:
+    #    labels_per_sp = target[ i ]
+    #    u_labels_per_sp = torch.unique( labels_per_sp )
+    #    hist = torch.zeros( len(u_labels_per_sp) )
+    #    for j in range(len(hist)):
+    #        hist[ j ] = len( torch.where( labels_per_sp == u_labels_per_sp[ j ] )[ 0 ] )
+    #    target[ l_inds[ i ] ] = u_labels_per_sp[ torch.argmax( hist ) ]
     loss = loss_fn(output, target)
     loss.backward()
     optimizer.step()
 
-    #print (batch_idx, '/', args.maxIter, ':', nLabels, loss.data[0])
     print (batch_idx, '/', args.maxIter, ':', nLabels, loss.item())
 
     if nLabels <= args.minLabels:
