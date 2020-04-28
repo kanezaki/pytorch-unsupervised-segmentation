@@ -62,14 +62,24 @@ if __name__ == "__main__":
                         help='visualization flag')
     parser.add_argument('--input', metavar='FILENAME',
                         help='input image file name', required=True)
+    parser.add_argument('--output', metavar='FILENAME2',
+                        help='output image file name', required=True)
     parser.add_argument('--seed', metavar='s', default=100, type=int, 
                         help='seed for pseudorandom generator')
+    parser.add_argument('--height', metavar='height', default=600, type=int, 
+                        help='height for reshape')
+    parser.add_argument('--width', metavar='width', default=848, type=int, 
+                        help='width for reshape')
+    parser.add_argument('--reshape', metavar='reshape', default=False, type=bool, 
+                        help='reshape?')
     args = parser.parse_args()
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
     # load image
     im = cv2.imread(args.input)
+    if args.reshape:
+        im = cv2.resize(im, (args.height, args.width))
     data = torch.from_numpy(np.array([im.transpose((2,0,1)).astype('float32')/255.]))
     if use_cuda:
         data = data.cuda()
@@ -131,5 +141,4 @@ if __name__ == "__main__":
         im_target = target.data.cpu().numpy()
         im_target_rgb = np.array([label_colours[c % 100] for c in im_target])
         im_target_rgb = im_target_rgb.reshape(im.shape).astype(np.uint8)
-    cv2.imwrite("output.png", im_target_rgb)
-    torch.save(model, "model.pt")
+    cv2.imwrite(args.output, im_target_rgb)
